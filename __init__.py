@@ -1,32 +1,73 @@
 from calendar import monthrange
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
-from gui.android import logutils
-from kivy.garden.roulette import TimeFormatCyclicRoulette, Roulette, CyclicRoulette
-from gui.android.datetimepicker.symbollabels import Dash, Symbol, Colon
-from gui.android.delayedcollidescrollview import DelayedCollideScrollView, \
-    DelayedCollideScrollView
-from kivy.garden.timeline import time_tail
-from kivy.base import runTouchApp
 from kivy.clock import Clock
-from kivy.config import Config
-from kivy.effects.scroll import ScrollEffect, ScrollEffect
+from kivy.effects.scroll import ScrollEffect
+from kivy.factory import Factory
+from kivy.garden.roulette import TimeFormatCyclicRoulette, Roulette, \
+    CyclicRoulette
 from kivy.lang import Builder
 from kivy.metrics import dp
 from kivy.properties import ObjectProperty, NumericProperty, AliasProperty, \
     BooleanProperty
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.scrollview import ScrollView
-from kutils.funcs import local_now
-Config.set('graphics', 'width', '400')
-Config.set('graphics', 'height', '700')
-Config.set('graphics', 'position', 'custom')
-Config.set('graphics', 'top', 70)
-Config.set('graphics', 'left', 70)
 
+# the following methods are inlined from ``Timeline`` to lessen deps requirement
+try:
+    from tzlocal import get_localzone
+except ImportError:
+    from jnius import autoclass
+    from pytz import timezone
+    TimeZone = autoclass('java.util.TimeZone')
+    def get_localzone():
+        return timezone(TimeZone.getDefault().getID())
+def local_now():
+        return get_localzone().localize(datetime.now())    
+    
+_tail_names = ['microsecond', 'second', 'minute', 'hour', 'day']
 
+def time_tail(dt, length=2, tail_name=None, strict=False):
+    '''given a datetime ``dt``, gives its time tail specified by ``length``
+    or ``tail_name``::
+    
+        >>> assert(
+            time_tail(datetime(2010, 10, 4, 13, 25, 5, 0.33)) ==
+            timedelta(seconds=5.33))
+        >>> assert(
+            time_tail(datetime(2010, 10, 4, 13, 25, 5, 0.33), 3) ==
+            timedelta(minutes=25, seconds=5.33))
+        >>> assert(
+            time_tail(datetime(2010, 10, 4, 13, 25, 5, 0.33), 
+                tail_name='hour') ==
+            timedelta(hour=13, minute=25, second=5.33))
+        >>> assert(
+            time_tail(datetime(2010, 10, 4, 13, 25, 5, 0.33), 
+                tail_name='hour', strict=True) ==
+            timedelta(minute=25, second=5.33))
+    '''
+    if tail_name:
+        length = _tail_names.index(tail_name) + 1 - strict
+    timedelta_kw = {}
+    for name in _tail_names[:length]:
+        timedelta_kw[name + 's'] = getattr(dt, name)
+    return timedelta(**timedelta_kw)
 
-logger = logutils.getLogger(__name__, 'INFO')
+Builder.load_string('''
+<Symbol@Label>:
+    size_hint_x: None
+    width: '20dp'
+    text: ''
+    font_size: '30sp'
+<Colon@Symbol>:
+    text: ':'
+<Dash@Symbol>:
+    text: '-'
+''')
+
+Symbol = Factory.Symbol
+Dash = Factory.Dash
+Colon = Factory.Colon
+
 
 Builder.load_string('''
 <DatetimeRouletteSelector>:
@@ -152,12 +193,9 @@ class DatetimeRouletteSelector(BoxLayout):
         self.month_size = month_size = monthrange(selected_year, 
                                                   selected_month)[1]
         day = self.day
-        logger.debug('new month size %s', month_size)
         if day.cycle == month_size:
-            logger.debug('month size same as before')
             return
         if day.selected_value > month_size:
-            logger.debug('day is greater than month_size')
             day.select_and_center(month_size)
 #             Clock.schedule_once(partial(self._adjust_day_cycle, month_size),
 # #                                 day.center_duration,
@@ -168,7 +206,6 @@ class DatetimeRouletteSelector(BoxLayout):
         new_cycle = kw.get('new_cycle', self.month_size)
         if new_cycle is None or self.day.cycle == new_cycle:
             return
-        logger.debug('adjusting day cycle')
         current_day = self.day.selected_value
         self.day.cycle = new_cycle
         # unless month_size gets set again, guards against erroneous adjustment
@@ -180,6 +217,4 @@ class DatetimeRouletteSelector(BoxLayout):
 #     def on_selected_datetime(self, *args):
 #         print self.selected_datetime
 if __name__ == '__main__':
-    scrollview = DelayedCollideScrollView(effect_cls=ScrollEffect)
-    scrollview.add_widget(DatetimeRouletteSelector())
-    runTouchApp(scrollview)
+    from kivy.base import runTouchApp
