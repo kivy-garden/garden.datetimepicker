@@ -1,3 +1,25 @@
+'''
+DatetimePicker
+=============
+
+:class:`DatetimePicker` is a roulette based datetime selector like in iOS
+and android.
+
+Dependencies
+------------
+
+The only immediate dependency is the garden package ``kivy.garden.roulette``.
+However, if you have never installed garden packages before, and start with
+only a default kivy python distribution, then the following is needed.
+
+1. garden packages. Use ``garden install`` to install them.
+
+    a. ``kivy.garden.tickline``
+    b. ``kivy.garden.roulette``
+    c. ``kivy.garden.roulettescroll``
+    
+'''
+
 from calendar import monthrange
 from datetime import datetime, timedelta
 from functools import partial
@@ -11,46 +33,6 @@ from kivy.metrics import dp
 from kivy.properties import ObjectProperty, NumericProperty, AliasProperty, \
     BooleanProperty
 from kivy.uix.boxlayout import BoxLayout
-
-# the following methods are inlined from ``Timeline`` to lessen deps requirement
-try:
-    from tzlocal import get_localzone
-except ImportError:
-    from jnius import autoclass
-    from pytz import timezone
-    TimeZone = autoclass('java.util.TimeZone')
-    def get_localzone():
-        return timezone(TimeZone.getDefault().getID())
-def local_now():
-        return get_localzone().localize(datetime.now())    
-    
-_tail_names = ['microsecond', 'second', 'minute', 'hour', 'day']
-
-def time_tail(dt, length=2, tail_name=None, strict=False):
-    '''given a datetime ``dt``, gives its time tail specified by ``length``
-    or ``tail_name``::
-    
-        >>> assert(
-            time_tail(datetime(2010, 10, 4, 13, 25, 5, 0.33)) ==
-            timedelta(seconds=5.33))
-        >>> assert(
-            time_tail(datetime(2010, 10, 4, 13, 25, 5, 0.33), 3) ==
-            timedelta(minutes=25, seconds=5.33))
-        >>> assert(
-            time_tail(datetime(2010, 10, 4, 13, 25, 5, 0.33), 
-                tail_name='hour') ==
-            timedelta(hour=13, minute=25, second=5.33))
-        >>> assert(
-            time_tail(datetime(2010, 10, 4, 13, 25, 5, 0.33), 
-                tail_name='hour', strict=True) ==
-            timedelta(minute=25, second=5.33))
-    '''
-    if tail_name:
-        length = _tail_names.index(tail_name) + 1 - strict
-    timedelta_kw = {}
-    for name in _tail_names[:length]:
-        timedelta_kw[name + 's'] = getattr(dt, name)
-    return timedelta(**timedelta_kw)
 
 Builder.load_string('''
 <Symbol@Label>:
@@ -70,7 +52,7 @@ Colon = Factory.Colon
 
 
 Builder.load_string('''
-<DatetimeRouletteSelector>:
+<DatetimePicker>:
     canvas.after:
         Color:
             rgba: 0, 0, 1, .3
@@ -82,15 +64,17 @@ Builder.load_string('''
             self.x + self.width, self.center_y - self.shield_width + self._shade_width
             width: self._shade_width
             cap: 'none'
-#     width: '350dp'
     size_hint: None, 1
     padding: [dp(10), 0, dp(10), 0]
 ''')
 
-class DatetimeRouletteSelector(BoxLayout):
+class DatetimePicker(BoxLayout):
     '''a simple roulette datetime selector for *timezone-naive* datetime.'''
-    shield_width = NumericProperty('25dp')
+    
     _shade_width = NumericProperty('1.5dp')
+    shield_width = NumericProperty('25dp')
+    '''setting for graphics. May be changed or obsoleted in the future.'''
+
     year = ObjectProperty(None)
     month = ObjectProperty(None)
     day = ObjectProperty(None)
@@ -98,19 +82,24 @@ class DatetimeRouletteSelector(BoxLayout):
     minute = ObjectProperty(None)
     second = ObjectProperty(None)
     
-    in_motion = BooleanProperty(False)
-    datetime_fields = ('year', 'month', 'day', 'hour', 'minute', 'second')
     selected_datetime = ObjectProperty(None)
+    '''tracks the datetime selection.'''
+    
+    in_motion = BooleanProperty(False)
+    '''indicates whether any of the member roulettes are in motion.'''
+    
+    datetime_fields = ('year', 'month', 'day', 'hour', 'minute', 'second')
     month_size = NumericProperty(None, allownone=True)
+
     def __init__(self, **kw):
-        super(DatetimeRouletteSelector, self).__init__(**kw)
+        super(DatetimePicker, self).__init__(**kw)
         self.init_roulettes()
     def init_roulettes(self):
         self._calibrate_month_size_trigger = t = \
                     Clock.create_trigger(self.calibrate_month_size)
         self._adjust_day_cycle_trigger = \
                     Clock.create_trigger(self._adjust_day_cycle, -1)
-        now = local_now()
+        now = datetime.now()
         self.second = second = TimeFormatCyclicRoulette(cycle=60)
         second.select_and_center(now.second)
         self.minute = minute = TimeFormatCyclicRoulette(cycle=60)
@@ -171,8 +160,8 @@ class DatetimeRouletteSelector(BoxLayout):
         ``largest_delta=True``, then only the hour roulette will be updated
         to center on ``5``, and no other changes are introduced.
         
-        This option is useful for reducing graphical load when scrolling the
-        timeline in :class:`TimelineAccordionItem` in the datetime screen.'''
+        This option is useful for reducing graphical load when linking
+        this roulette to changing values of time.'''
         largest_delta = kw.get('largest_delta')
         for field in self.datetime_fields:
             changed = getattr(self, field).select_and_center(getattr(val, field))
@@ -197,9 +186,6 @@ class DatetimeRouletteSelector(BoxLayout):
             return
         if day.selected_value > month_size:
             day.select_and_center(month_size)
-#             Clock.schedule_once(partial(self._adjust_day_cycle, month_size),
-# #                                 day.center_duration,
-#                                 1)
         else:
             self._adjust_day_cycle()
     def _adjust_day_cycle(self, *args, **kw):
@@ -214,7 +200,6 @@ class DatetimeRouletteSelector(BoxLayout):
         
         self.day.select_and_center(current_day, animate=False)
     
-#     def on_selected_datetime(self, *args):
-#         print self.selected_datetime
 if __name__ == '__main__':
     from kivy.base import runTouchApp
+    runTouchApp(DatetimePicker())
