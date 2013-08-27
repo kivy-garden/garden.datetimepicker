@@ -14,7 +14,9 @@ only a default kivy python distribution, then the following garden packages
 are needed. Use ``garden install`` to install them.
 
 a. ``kivy.garden.tickline``
+
 b. ``kivy.garden.roulette``
+
 c. ``kivy.garden.roulettescroll``
 
 Usage
