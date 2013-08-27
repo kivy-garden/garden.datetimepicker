@@ -1,6 +1,6 @@
 '''
 DatetimePicker
-=============
+==============
 
 :class:`DatetimePicker` is a roulette based datetime selector like in iOS
 and android.
@@ -10,14 +10,36 @@ Dependencies
 
 The only immediate dependency is the garden package ``kivy.garden.roulette``.
 However, if you have never installed garden packages before, and start with
-only a default kivy python distribution, then the following is needed.
+only a default kivy python distribution, then the following garden packages
+are needed. Use ``garden install`` to install them.
 
-1. garden packages. Use ``garden install`` to install them.
+a. ``kivy.garden.tickline``
+b. ``kivy.garden.roulette``
+c. ``kivy.garden.roulettescroll``
 
-    a. ``kivy.garden.tickline``
-    b. ``kivy.garden.roulette``
-    c. ``kivy.garden.roulettescroll``
+Usage
+-----
+
+Just instantiate ``DatetimePicker()``::
+
+    if __name__ == '__main__':
+        from kivy.base import runTouchApp
+        runTouchApp(DatetimePicker())
     
+This will give you 6 vertical roulettes
+that respectively represent year, month, day, hour, minute, and second. 
+
+:attr:`DatetimePicker.selected_value` records the selection from the user.
+
+:attr:`DatetimePicker.density` controls how many values are shown at a time.
+
+NICER GRAPHICS!
+---------------
+
+I didn't focus much on the graphics, or to closely simulate the iOS or android
+experience. You are encourage to contribute to improve the default appearance
+of the datetimepicker!
+
 '''
 
 from calendar import monthrange
@@ -60,8 +82,11 @@ Builder.load_string('''
             pos: self.x, self.center_y - self.shield_width
             size: self.width, 2 * self.shield_width
         Line:
-            points: self.x, self.center_y - self.shield_width + self._shade_width, \
-            self.x + self.width, self.center_y - self.shield_width + self._shade_width
+            points: 
+                self.x, \
+                self.center_y - self.shield_width + self._shade_width, \
+                self.x + self.width, \
+                self.center_y - self.shield_width + self._shade_width
             width: self._shade_width
             cap: 'none'
     size_hint: None, 1
@@ -82,6 +107,9 @@ class DatetimePicker(BoxLayout):
     minute = ObjectProperty(None)
     second = ObjectProperty(None)
     
+    density = NumericProperty(4.2)
+    '''determines how many values are shown at a time on each roulette.'''
+    
     selected_datetime = ObjectProperty(None)
     '''tracks the datetime selection.'''
     
@@ -100,20 +128,22 @@ class DatetimePicker(BoxLayout):
         self._adjust_day_cycle_trigger = \
                     Clock.create_trigger(self._adjust_day_cycle, -1)
         now = datetime.now()
-        self.second = second = TimeFormatCyclicRoulette(cycle=60)
+        kw = {'density': self.density}
+        self.second = second = TimeFormatCyclicRoulette(cycle=60, **kw)
         second.select_and_center(now.second)
-        self.minute = minute = TimeFormatCyclicRoulette(cycle=60)
+        self.minute = minute = TimeFormatCyclicRoulette(cycle=60, **kw)
         minute.select_and_center(now.minute)
-        self.hour = hour = TimeFormatCyclicRoulette(cycle=24)
+        self.hour = hour = TimeFormatCyclicRoulette(cycle=24, **kw)
         hour.select_and_center(now.hour)
-        self.year = year = Roulette()
+        self.year = year = Roulette(**kw)
         year.select_and_center(now.year)
-        self.month = month = CyclicRoulette(cycle=12, zero_indexed=False)
+        self.month = month = CyclicRoulette(cycle=12, zero_indexed=False, **kw)
         month.select_and_center(now.month)
         
         month_size = monthrange(now.year, now.month)[1]
         self.day = day = CyclicRoulette(cycle=month_size, zero_indexed=False,
-                                        on_centered=self._adjust_day_cycle_trigger)
+                                        on_centered=self._adjust_day_cycle_trigger,
+                                        **kw)
         day.select_and_center(now.day)
         
         self.month.bind(selected_value=t)
