@@ -119,6 +119,9 @@ class DatetimePicker(BoxLayout):
     in_motion = BooleanProperty(False)
     '''indicates whether any of the member roulettes are in motion.'''
 
+    roulette_width = NumericProperty('60dp')
+    '''changes the width of all datepicker roulettes'''
+
     datetime_fields = ('year', 'month', 'day', 'hour', 'minute', 'second')
     month_size = NumericProperty(None, allownone=True)
 
@@ -135,16 +138,20 @@ class DatetimePicker(BoxLayout):
         kw = {'density': self.density}
         self.second = second = TimeFormatCyclicRoulette(cycle=60, **kw)
         second.select_and_center(now.second)
+
         self.minute = minute = TimeFormatCyclicRoulette(cycle=60, **kw)
         minute.select_and_center(now.minute)
+
         self.hour = hour = TimeFormatCyclicRoulette(cycle=24, **kw)
         hour.select_and_center(now.hour)
+
         self.year = year = Roulette(**kw)
         year.select_and_center(now.year)
+
         self.month = month = CyclicRoulette(cycle=12, zero_indexed=False, **kw)
         month.select_and_center(now.month)
-
         month_size = monthrange(now.year, now.month)[1]
+
         self.day = day = CyclicRoulette(cycle=month_size, zero_indexed=False,
             on_centered=self._adjust_day_cycle_trigger,
             **kw)
@@ -153,6 +160,7 @@ class DatetimePicker(BoxLayout):
         self.month.bind(selected_value=t)
         self.year.bind(selected_value=t)
 
+        self.set_roulette_width()
         self.set_selected_datetime()
         self._bind_updates()
         self.add_widgets()
@@ -215,6 +223,10 @@ class DatetimePicker(BoxLayout):
         if new_dt:
             self.selected_datetime = new_dt
 
+    def set_roulette_width(self, *args):
+        for field in self.datetime_fields:
+            getattr(self, field).width = self.roulette_width
+
     def _bind_updates(self, *args):
         for field in self.datetime_fields:
             getattr(self, field).bind(selected_value=self.set_selected_datetime,
@@ -248,6 +260,7 @@ class DatetimePicker(BoxLayout):
 
 class DatePicker(DatetimePicker):
     '''a simple roulette date selector for *timezone-naive* datetime.'''
+
     def add_widgets(self):
         children = [
                     self.year, Dash(), self.month, Dash(), self.day
